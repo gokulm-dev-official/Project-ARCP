@@ -1,17 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Car, ShieldAlert, Search, MapPin, Volume2, VolumeX } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-
-// Fix Leaflet's default icon issue
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+import Premium3DMap from '../components/Premium3DMap';
+import { Marker, Source, Layer } from 'react-map-gl';
 
 // Helper to calculate distance in km
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -26,14 +17,6 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   return parseFloat((R * c).toFixed(1));
 };
 
-const MapUpdater = ({ center }) => {
-  const map = useMap();
-  React.useEffect(() => {
-    if (center) map.setView(center, map.getZoom());
-  }, [center, map]);
-  return null;
-};
-
 const VehicleDashboard = () => {
   const navigate = useNavigate();
   const [vehicleLocation, setVehicleLocation] = useState(null);
@@ -45,8 +28,17 @@ const VehicleDashboard = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [alarmAudio] = useState(new Audio('/alarm.wav'));
 
+  const [viewState, setViewState] = useState({
+    longitude: 80.2500,
+    latitude: 13.0650,
+    zoom: 14,
+    pitch: 60,
+    bearing: 0
+  });
+
   const fetchLocationData = async (lat, lng) => {
     setVehicleLocation([lat, lng]);
+    setViewState(prev => ({ ...prev, latitude: lat, longitude: lng }));
     setLocationName("Locating...");
 
     try {
@@ -101,15 +93,6 @@ const VehicleDashboard = () => {
       console.error("Geocoding failed", err);
       setLocationName("Search failed");
     }
-  };
-
-  const LocationPicker = () => {
-    useMapEvents({
-      click(e) {
-        fetchLocationData(e.latlng.lat, e.latlng.lng);
-      },
-    });
-    return null;
   };
 
   // 2. Listen for Real-Time Storage Events (Cross-Tab Communication)
@@ -272,40 +255,42 @@ const VehicleDashboard = () => {
           {/* Map Panel */}
           <div className="col-span-2 bg-white rounded-3xl shadow-sm overflow-hidden border border-gray-100 flex flex-col relative z-0">
             {vehicleLocation ? (
-              <MapContainer 
-                center={vehicleLocation} 
-                zoom={14} 
-                style={{ width: '100%', height: '100%' }}
-                zoomControl={false}
-              >
-                <MapUpdater center={vehicleLocation} />
-                <LocationPicker />
-                <TileLayer
-                  attribution='&copy; OpenStreetMap contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
+              <Premium3DMap viewState={viewState} setViewState={setViewState}>
                 
                 {/* Vehicle Marker */}
-                <Marker position={vehicleLocation}>
-                  <Popup>Your Vehicle</Popup>
+                <Marker longitude={vehicleLocation[1]} latitude={vehicleLocation[0]}>
+                  <div className="w-8 h-8 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg text-xs" title="Your Vehicle">
+                    🚘
+                  </div>
                 </Marker>
 
                 {/* Ambulance Marker & Line (if active) */}
                 {emergencyData && isAlertActive && (
                   <>
-                    <Marker position={[emergencyData.lat, emergencyData.lng]}>
-                      <Popup>Approaching Ambulance</Popup>
+                    <Marker longitude={emergencyData.lng} latitude={emergencyData.lat}>
+                      <div className="relative flex items-center justify-center">
+                        <div className="absolute w-12 h-12 bg-red-500/30 rounded-full animate-ping"></div>
+                        <div className="w-8 h-8 bg-red-600 rounded-full border-2 border-white shadow-[0_0_20px_rgba(239,68,68,0.8)] flex items-center justify-center text-xs z-10">
+                          🚑
+                        </div>
+                      </div>
                     </Marker>
-                    <Polyline 
-                      positions={[vehicleLocation, [emergencyData.lat, emergencyData.lng]]} 
-                      color="#DC2626" 
-                      weight={5} 
-                      dashArray="10, 10" 
-                      className="animate-pulse"
-                    />
+                    <Source id="line" type="geojson" data={{
+                      type: 'Feature',
+                      geometry: {
+                        type: 'LineString',
+                        coordinates: [[vehicleLocation[1], vehicleLocation[0]], [emergencyData.lng, emergencyData.lat]]
+                      }
+                    }}>
+                      <Layer
+                        id="line-layer"
+                        type="line"
+                        paint={{ 'line-color': '#ef4444', 'line-width': 4, 'line-dasharray': [2, 2], 'line-opacity': 0.8 }}
+                      />
+                    </Source>
                   </>
                 )}
-              </MapContainer>
+              </Premium3DMap>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-0">
                 <span className="text-gray-500 font-medium animate-pulse">Establishing GPS connection...</span>
@@ -315,7 +300,7 @@ const VehicleDashboard = () => {
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
                <div className="bg-gray-900/80 backdrop-blur text-white px-4 py-2 rounded-full shadow-lg border border-gray-700 pointer-events-auto flex items-center">
                  <MapPin className="w-4 h-4 mr-2 text-primary" />
-                 <span className="text-sm font-medium">Click anywhere on map to manually set your car's location</span>
+                 <span className="text-sm font-medium">Mapbox 3D Navigation active</span>
                </div>
             </div>
           </div>

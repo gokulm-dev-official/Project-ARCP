@@ -1,16 +1,76 @@
+# ==================================================================
+# Smart Ambulance Alert System — Application Configuration
+# ==================================================================
+
 spring:
   application:
-    name: backend
+    name: smart-ambulance-backend
+
+  # ---- MySQL (Relational Data) ----
+  datasource:
+    url: jdbc:mysql://localhost:3306/smart_ambulance?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  # ---- MongoDB (Geospatial / Time-Series Data) ----
   data:
     mongodb:
       uri: mongodb://localhost:27017/smart_ambulance
+      auto-index-creation: true
+
+  # ---- RabbitMQ ----
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+# ---- Server ----
 server:
   port: 8080
+  servlet:
+    context-path: /
 
-jwt:
-  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970 # Placeholder key
-  expiration: 86400000 # 1 day
+# ---- JWT ----
+app:
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970337538782F413F4428472B4B6250645367
+    expiration-ms: 86400000  # 24 hours
+  cors:
+    allowed-origins: http://localhost:5173,http://localhost:3000
+  alert:
+    default-radius-meters: 500
+    critical-radius-meters: 200
+    broadcast-interval-ms: 1000
 
-google:
-  maps:
-    api-key: YOUR_GOOGLE_MAPS_API_KEY_HERE
+# ---- OpenRouteService ----
+openrouteservice:
+  api-key: YOUR_ORS_API_KEY_HERE
+  base-url: https://api.openrouteservice.org
+
+# ---- Swagger ----
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+# ---- Logging ----
+logging:
+  level:
+    com.smartambulance: DEBUG
+    org.springframework.web.socket: DEBUG
+    org.springframework.messaging: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
